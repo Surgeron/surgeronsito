@@ -1,1 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nuestros Momentos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Raleway:wght@200;300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #0f0d0b;
+      --gold:   #c9a96e;
+      --cream:  #f0e8d8;
+      --muted:  #5a5248;
+      --dim:    #2a2420;
+    }
+    html, body {
+      width:100%; height:100%;
+      background: var(--bg);
+      overflow: hidden;
+      font-family: 'Raleway', sans-serif;
+    }
+    /* grain */
+    body::after {
+      content:''; position:fixed; inset:0; z-index:1000; pointer-events:none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+      opacity:0.5;
+    }
+    .bg-glow {
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(201,169,110,0.07) 0%, transparent 70%);
+    }
 
+    /* ── TITLE ── */
+    .title-wrap {
+      position:fixed; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      z-index:10; text-align:center; pointer-events:none;
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    .title-wrap.hidden { opacity:0; transform:translate(-50%,-50%) scale(.95); pointer-events:none; }
+    .title-label {
+      font-weight:200; font-size:11px; letter-spacing:.35em;
+      text-transform:uppercase; color:var(--gold); opacity:.7; margin-bottom:10px;
+    }
+    .title-main {
+      font-family:'Playfair Display',serif; font-style:italic; font-weight:400;
+      font-size:clamp(2.4rem,7vw,4.5rem); color:var(--cream); line-height:1.1;
+      text-shadow:0 2px 40px rgba(0,0,0,.8);
+    }
+    .title-main span { color:var(--gold); }
+    .title-sub {
+      margin-top:12px; font-weight:200; font-size:12px;
+      letter-spacing:.2em; color:var(--muted);
+    }
+
+    /* ── OVERLAY for carousel ── */
+    #overlay {
+      position:fixed; inset:0; z-index:50;
+      background: rgba(10,8,6,0);
+      pointer-events:none;
+      transition: background .5s ease;
+    }
+    #overlay.active {
+      background: rgba(10,8,6,0.82);
+      pointer-events:auto;
+    }
+
+    /* ── CLOSE BTN ── */
+    #close-btn {
+      position:fixed; top:20px; right:20px; z-index:200;
+      background:none; border:none; cursor:pointer;
+      color:var(--cream); opacity:0;
+      transition: opacity .4s ease;
+      padding:8px;
+    }
+    #close-btn.visible { opacity:.6; }
+    #close-btn:hover { opacity:1; }
+
+    /* ── CAROUSEL ARROWS ── */
+    .arrow {
+      position:fixed; top:50%; z-index:200;
+      transform:translateY(-50%);
+      background:none; border:none; cursor:pointer;
+      color:var(--cream); opacity:0;
+      transition: opacity .4s ease;
+      padding:16px;
+    }
+    .arrow.visible { opacity:.5; }
+    .arrow:hover { opacity:1; }
+    #arr-prev { left:16px; }
+    #arr-next { right:16px; }
+
+    /* ── COUNTER ── */
+    #counter {
+      position:fixed; bottom:28px; left:50%;
+      transform:translateX(-50%);
+      z-index:200; opacity:0;
+      transition: opacity .4s ease;
+      font-size:11px; letter-spacing:.25em;
+      text-transform:uppercase; color:var(--gold);
+    }
+    #counter.visible { opacity:.7; }
+
+    /* ── FLOOR ── */
+    #floor { position:fixed; inset:0; z-index:5; }
+
+    /* ── PHOTOCARD ── */
+    .pcard {
+      position:absolute;
+      width:160px;
+      background:#1e1a15;
+      border-radius:4px;
+      padding:10px 10px 32px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.7), 0 1px 4px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04);
+      cursor:pointer;
+      will-change:transform;
+      transition: box-shadow .3s ease;
+      /* floor animation set via JS style */
+    }
+    .pcard.carousel-mode {
+      transition: transform .55s cubic-bezier(.22,1,.36,1), opacity .45s ease, box-shadow .3s ease !important;
+      animation: none !important;
+    }
+    .pcard.active-card {
+      box-shadow: 0 24px 80px rgba(0,0,0,.9), 0 4px 16px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.07) !important;
+      cursor:default;
+    }
+
+    /* photo area */
+    .pcard-photo {
+      width:100%; aspect-ratio:3/4;
+      background:var(--dim); border-radius:2px;
+      overflow:hidden; position:relative;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .pcard-photo::before {
+      content:''; position:absolute; inset:0;
+      background: repeating-linear-gradient(45deg, rgba(255,255,255,.015) 0px, rgba(255,255,255,.015) 1px, transparent 1px, transparent 12px);
+    }
+    .pcard-photo img { width:100%; height:100%; object-fit:cover; display:block; position:relative; z-index:1; }
+    .photo-hint {
+      position:absolute; inset:0; z-index:2;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+      opacity:0; transition:opacity .2s ease;
+      background:rgba(0,0,0,.55); border-radius:2px;
+    }
+    .pcard:hover .photo-hint { opacity:1; }
+    .active-card .photo-hint { opacity:0 !important; pointer-events:none; }
+    .photo-hint span { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.6); }
+
+    .pcard-caption { margin-top:8px; text-align:center; font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+    .pcard-stamp { position:absolute; bottom:9px; right:12px; font-size:8px; letter-spacing:.1em; color:var(--gold); opacity:.5; font-style:italic; font-family:'Playfair Display',serif; }
+    .pcard input[type="file"] { display:none; }
+
+    /* floor drift animations */
+    @keyframes drift0{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(4px,-8px) rotate(calc(var(--rot)+1.5deg));}}
+    @keyframes drift1{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(-6px,5px) rotate(calc(var(--rot)-2deg));}}
+    @keyframes drift2{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(5px,7px) rotate(calc(var(--rot)+1deg));}}
+    @keyframes drift3{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(-4px,-6px) rotate(calc(var(--rot)-1.5deg));}}
+    @keyframes drift4{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(7px,-4px) rotate(calc(var(--rot)+2deg));}}
+    @keyframes drift5{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(-3px,8px) rotate(calc(var(--rot)-1deg));}}
+    @keyframes drift6{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(6px,3px) rotate(calc(var(--rot)+2.5deg));}}
+    @keyframes drift7{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(-5px,-5px) rotate(calc(var(--rot)-2deg));}}
+    @keyframes drift8{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(3px,9px) rotate(calc(var(--rot)+1deg));}}
+    @keyframes drift9{0%,100%{transform:translate(0,0) rotate(var(--rot));}50%{transform:translate(-7px,4px) rotate(calc(var(--rot)-2.5deg));}}
+    @keyframes fadeIn{from{opacity:0;transform:translate(0,20px) rotate(var(--rot));}to{opacity:1;transform:translate(0,0) rotate(var(--rot));}}
+  </style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+<div id="overlay"></div>
+
+<!-- Title -->
+<div class="title-wrap" id="title">
+  <p class="title-label">para siempre</p>
+  <h1 class="title-main">Nuestros<br><span>momentos.</span></h1>
+  <p class="title-sub">tocá una foto para verla</p>
+</div>
+
+<!-- Carousel controls -->
+<button id="close-btn" aria-label="Cerrar">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+</button>
+<button class="arrow" id="arr-prev" aria-label="Anterior">
+  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+</button>
+<button class="arrow" id="arr-next" aria-label="Siguiente">
+  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
+</button>
+<div id="counter"></div>
+
+<!-- Floor -->
+<div id="floor"></div>
+
+<script>
+const CONFIGS = [
+  { left:4,  top:5,  rot:-12, drift:'drift0', dur:7.2, delay:0,   z:2, caption:'recuerdo 01', stamp:'verano'    },
+  { left:22, top:2,  rot:5,   drift:'drift1', dur:8.5, delay:0.8, z:3, caption:'recuerdo 02', stamp:'otoño'     },
+  { left:55, top:1,  rot:-7,  drift:'drift2', dur:6.8, delay:1.4, z:2, caption:'recuerdo 03', stamp:'invierno'  },
+  { left:74, top:3,  rot:14,  drift:'drift3', dur:9.1, delay:0.3, z:4, caption:'recuerdo 04', stamp:'primavera' },
+  { left:2,  top:45, rot:8,   drift:'drift4', dur:7.6, delay:1.0, z:3, caption:'recuerdo 05', stamp:'enero'     },
+  { left:78, top:40, rot:-10, drift:'drift5', dur:8.0, delay:0.5, z:2, caption:'recuerdo 06', stamp:'febrero'   },
+  { left:8,  top:72, rot:-6,  drift:'drift6', dur:7.4, delay:1.6, z:3, caption:'recuerdo 07', stamp:'marzo'     },
+  { left:28, top:68, rot:11,  drift:'drift7', dur:9.3, delay:0.2, z:4, caption:'recuerdo 08', stamp:'abril'     },
+  { left:58, top:65, rot:-13, drift:'drift8', dur:6.9, delay:1.2, z:2, caption:'recuerdo 09', stamp:'mayo'      },
+  { left:76, top:68, rot:7,   drift:'drift9', dur:8.7, delay:0.7, z:3, caption:'recuerdo 10', stamp:'junio'     },
+];
+
+const floor   = document.getElementById('floor');
+const overlay = document.getElementById('overlay');
+const title   = document.getElementById('title');
+const counter = document.getElementById('counter');
+const closeBtn= document.getElementById('close-btn');
+const arrPrev = document.getElementById('arr-prev');
+const arrNext = document.getElementById('arr-next');
+
+let cards = [];
+let carouselMode = false;
+let activeIndex = 0;
+
+// ── Build cards ──
+CONFIGS.forEach((cfg, i) => {
+  const card = document.createElement('div');
+  card.className = 'pcard';
+  card.dataset.index = i;
+  card.style.cssText = `
+    left:${cfg.left}vw; top:${cfg.top}vh; z-index:${cfg.z};
+    --rot:${cfg.rot}deg;
+    animation: fadeIn .9s cubic-bezier(.22,1,.36,1) ${cfg.delay+0.3}s both,
+               ${cfg.drift} ${cfg.dur}s ease-in-out ${cfg.delay+1.2}s infinite;
+  `;
+
+  card.innerHTML = `
+    <div class="pcard-photo">
+      <img id="img-${i}" src="" alt="" style="display:none"/>
+      <div class="photo-hint">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <span>agregar foto</span>
+      </div>
+    </div>
+    <p class="pcard-caption">${cfg.caption}</p>
+    <span class="pcard-stamp">${cfg.stamp}</span>
+    <input type="file" id="file-${i}" accept="image/*"/>
+  `;
+
+  // file upload
+  card.querySelector(`#file-${i}`).addEventListener('change', function(e){
+    e.stopPropagation();
+    const file = this.files[0];
+    if(!file) return;
+    const img = card.querySelector(`#img-${i}`);
+    img.src = URL.createObjectURL(file);
+    img.style.display = 'block';
+  });
+
+  // click handler
+  card.addEventListener('click', (e) => {
+    // if clicking the upload area and NOT in carousel mode → open file
+    if(!carouselMode) {
+      // open file picker only when clicking the photo area
+      const photo = card.querySelector('.pcard-photo');
+      if(photo.contains(e.target) || e.target === photo) {
+        card.querySelector(`#file-${i}`).click();
+        return;
+      }
+      // tap anywhere on card → open carousel
+      openCarousel(i);
+    }
+  });
+
+  floor.appendChild(card);
+  cards.push(card);
+});
+
+// ── Carousel ──
+function openCarousel(index) {
+  carouselMode = true;
+  activeIndex  = index;
+
+  overlay.classList.add('active');
+  title.classList.add('hidden');
+  closeBtn.classList.add('visible');
+  arrPrev.classList.add('visible');
+  arrNext.classList.add('visible');
+  counter.classList.add('visible');
+
+  positionCarousel();
+}
+
+function closeCarousel() {
+  carouselMode = false;
+
+  overlay.classList.remove('active');
+  title.classList.remove('hidden');
+  closeBtn.classList.remove('visible');
+  arrPrev.classList.remove('visible');
+  arrNext.classList.remove('visible');
+  counter.classList.remove('visible');
+
+  // restore floor positions
+  cards.forEach((card, i) => {
+    const cfg = CONFIGS[i];
+    card.classList.remove('carousel-mode','active-card');
+    card.style.transform = '';
+    card.style.opacity   = '';
+    card.style.zIndex    = cfg.z;
+    // re-enable drift animation
+    card.style.animation = `${cfg.drift} ${cfg.dur}s ease-in-out ${cfg.delay+1.2}s infinite`;
+  });
+}
+
+function positionCarousel() {
+  const n     = cards.length;
+  const vw    = window.innerWidth;
+  const vh    = window.innerHeight;
+  // card size in carousel: scale to ~55vh tall (aspect 3:4 → width = h*3/4)
+  const cardH = Math.min(vh * 0.62, 460);
+  const cardW = cardH * (160/208); // original aspect ratio approx
+  const gap   = cardW * 0.18;      // gap between side cards
+
+  cards.forEach((card, i) => {
+    card.classList.add('carousel-mode');
+    card.style.animation = 'none';
+
+    const offset = i - activeIndex;
+    // wrap offset for circular feel
+    let o = offset;
+    if(o > n/2)  o -= n;
+    if(o < -n/2) o += n;
+
+    const absO = Math.abs(o);
+
+    if(absO === 0) {
+      // active: centered, big, upright
+      card.classList.add('active-card');
+      const x = vw/2 - cardW/2;
+      const y = vh/2 - cardH/2;
+      card.style.transform = `translate(${x - parseFloat(card.style.left || CONFIGS[i].left*vw/100)}px,
+                                         ${y - parseFloat(card.style.top  || CONFIGS[i].top *vh/100)}px)
+                               rotate(0deg) scale(1)`;
+      card.style.opacity  = '1';
+      card.style.zIndex   = '100';
+      card.style.width    = cardW + 'px';
+    } else {
+      card.classList.remove('active-card');
+      const side   = o < 0 ? -1 : 1;
+      const shrink = Math.max(0.55 - (absO-1)*0.1, 0.35);
+      const rot    = side * (12 + (absO-1)*6);
+      const xOff   = side * (cardW*0.5 + gap + (absO-1)*(cardW*shrink + gap*0.5));
+      const yOff   = absO * 18;
+
+      const baseLeft = CONFIGS[i].left * vw / 100;
+      const baseTop  = CONFIGS[i].top  * vh / 100;
+      const cx = vw/2 - cardW/2;
+      const cy = vh/2 - cardH/2;
+
+      card.style.transform = `translate(${cx + xOff - baseLeft}px,
+                                         ${cy + yOff - baseTop}px)
+                               rotate(${rot}deg) scale(${shrink})`;
+      card.style.opacity  = absO <= 2 ? String(1 - (absO-1)*0.35) : '0';
+      card.style.zIndex   = String(90 - absO*10);
+      card.style.width    = '160px';
+    }
+  });
+
+  counter.textContent = `${activeIndex + 1} / ${cards.length}`;
+}
+
+function goNext() { activeIndex = (activeIndex + 1) % cards.length; positionCarousel(); }
+function goPrev() { activeIndex = (activeIndex - 1 + cards.length) % cards.length; positionCarousel(); }
+
+arrNext.addEventListener('click', goNext);
+arrPrev.addEventListener('click', goPrev);
+closeBtn.addEventListener('click', closeCarousel);
+overlay.addEventListener('click', closeCarousel);
+
+// keyboard
+document.addEventListener('keydown', e => {
+  if(!carouselMode) return;
+  if(e.key === 'ArrowRight') goNext();
+  if(e.key === 'ArrowLeft')  goPrev();
+  if(e.key === 'Escape')     closeCarousel();
+});
+
+// touch swipe on carousel
+let touchStartX = 0;
+document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, {passive:true});
+document.addEventListener('touchend', e => {
+  if(!carouselMode) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if(Math.abs(dx) > 50) dx < 0 ? goNext() : goPrev();
+});
+
+// resize
+window.addEventListener('resize', () => { if(carouselMode) positionCarousel(); });
+</script>
+</body>
+</html>
